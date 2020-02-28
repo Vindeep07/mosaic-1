@@ -15,6 +15,7 @@
 const rlp = require('rlp');
 
 import shared from './shared';
+import BN = require('bn.js');
 'use strict';
 
 export default class Utils {
@@ -36,8 +37,8 @@ export default class Utils {
   }
 
   static async storagePath(
-    storageIndex: string,
-    mappings: any,
+    storageIndex,
+    mappings,
   ) {
     let path = '';
     if (mappings && mappings.length > 0) {
@@ -57,7 +58,64 @@ export default class Utils {
     const formattedProof = proof.map(p => rlp.decode(p));
     return `0x${rlp.encode(formattedProof).toString('hex')}`;
   }
+
+  static async getDepositIntentHash(
+    valueToken,
+    amount, 
+    beneficiary
+  ) {
+    const DEPOSIT_INTENT_TYPEHASH = shared.web3.utils.soliditySha3('DepositIntent(address valueToken,uint256 amount,address beneficiary)');
+    return shared.web3.utils.sha3(
+      shared.web3.eth.abi.encodeParameters(
+        ['bytes32', 'address', 'uint256', 'address'],
+        [DEPOSIT_INTENT_TYPEHASH, valueToken, amount.toString(), beneficiary],
+      ),
+    );
+  }
+
+  static async hashMessage(
+    intentHash,
+    nonce,
+    feeGasPrice,
+    feeGasLimit,
+    sender,
+    channelIdentifier,
+  ) {
+    const MESSAGE_TYPEHASH = shared.web3.utils.keccak256(
+      'Message(bytes32 intentHash,uint256 nonce,uint256 feeGasPrice,uint256 feeGasLimit,address sender)',
+    );
+    const typedMessageHash = shared.web3.utils.keccak256(
+      shared.web3.eth.abi.encodeParameters(
+        [
+          'bytes32',
+          'bytes32',
+          'uint256',
+          'uint256',
+          'uint256',
+          'address',
+        ],
+        [
+          MESSAGE_TYPEHASH,
+          intentHash,
+          nonce,
+          feeGasPrice,
+          feeGasLimit,
+          sender,
+        ],
+      ),
+    );
   
+    const messageHash_ = shared.web3.utils.soliditySha3(
+      { t: 'bytes1', v: '0x19' },
+      { t: 'bytes1', v: '0x4d' },
+      { t: 'bytes32', v: channelIdentifier },
+      { t: 'bytes32', v: typedMessageHash },
+    );
+  
+    return messageHash_;
+  }
+
+  static async 
   /**
    * Send Transaction.
    * @param rawTx Raw Transaction object.
